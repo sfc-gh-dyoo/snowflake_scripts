@@ -1,0 +1,453 @@
+use role sales_engineer;
+use warehouse smorris_wh;
+use schema temp.smorris;
+
+-- set name of demo
+set var_fiscal_offset = 1;
+set var_calendar_table = 'calendar';
+set var_opportunity_table = 'opportunity';
+set var_opportunity_stream = 'opportunity_stream';
+set var_pipeline_stream = 'pipeline_stream';
+set var_opportunity_stage_table = 'opportunity_stage';
+set var_pipeline_type_table = 'pipeline_type';
+set var_opportunity_stream_history_table = 'opportunity_stream_history';
+set var_pipeline_history_table = 'pipeline_history';
+set var_crm_db = 'FIVETRAN';
+set var_crm_schema = $var_crm_db||'.'||'SALESFORCE';
+set var_crm_opportunity_table = $var_crm_schema||'.'||'OPPORTUNITY';
+set var_crm_stage_table = $var_crm_schema||'.'||'OPPORTUNITY_STAGE';
+
+/*--------------------------------------------------------------------------------
+  Calendar
+--------------------------------------------------------------------------------*/
+
+-- create calendar table
+create or replace table identifier($var_calendar_table) as
+select  dateadd( day, + ( row_number() over ( order by null)), dateadd( year, -10, dateadd( day, -1, date_trunc( year, current_date()))))   date 
+        ,dateadd( month, $var_fiscal_offset, date_trunc( year, dateadd( month, -$var_fiscal_offset, date)))                                 year_date
+        ,year( dateadd( month, -$var_fiscal_offset, date))                                                                                  year_num
+        ,to_number(substring( year_num, 3))                                                                                                 year_num_short
+        ,'FY'||year_num                                                                                                                     year_fiscal
+        ,year(year_date) - year( dateadd( month, -$var_fiscal_offset, current_date()))                                                      year_offset
+        ,dateadd( month, $var_fiscal_offset, date_trunc( quarter, dateadd( month, -$var_fiscal_offset, date)))                              quarter_date
+        ,substring( quarter_date, 0, 7)                                                                                                     quarter_date_short
+        ,quarter( dateadd( month, -$var_fiscal_offset, date))                                                                               quarter_num
+        ,'FQ'||quarter_num                                                                                                                  quarter_fiscal
+        ,quarter_num - quarter( dateadd( month, -$var_fiscal_offset, current_date())) + ( year_offset * 4)                                  quarter_offset
+        ,date_trunc( month, date)                                                                                                           month_date
+        ,substring( month_date, 0, 7)                                                                                                       month_date_short
+        ,month( date)                                                                                                                       month_num
+        ,'FM'||month( dateadd( month, -$var_fiscal_offset, date))                                                                           month_fiscal
+        ,month_num - month( current_date()) + (quarter_offset * 3)                                                                          month_offset
+        ,week( dateadd( month, -$var_fiscal_offset, date))                                                                                  week_num
+        ,dayofyear( dateadd( month, -$var_fiscal_offset, date))                                                                             day_year_num
+        ,dayofmonth( date)                                                                                                                  day_month_num
+        ,dayofweek( date) + 1                                                                                                               day_week_num
+        ,date - current_date()                                                                                                              day_offset
+from    table(generator(rowcount => (365 * 20) + 5 ) ) as calendar;
+
+/*--------------------------------------------------------------------------------
+  Opportunity
+--------------------------------------------------------------------------------*/
+
+-- create opportunity table
+create or replace table identifier($var_opportunity_table) (
+    opportunity_id         string
+    ,account_id             string
+    ,amount                 number
+    ,stage                  string
+    ,date_created           date
+    ,date_closed            date
+);
+
+create or replace stream identifier($var_opportunity_stream) on table identifier($var_opportunity_table);
+create or replace stream identifier($var_pipeline_stream) on table identifier($var_opportunity_table);
+
+insert into identifier($var_opportunity_table) ( opportunity_id, account_id, amount, stage, date_created, date_closed)
+select  distinct opportunity.id_opportunity
+        ,account.id
+        ,opportunity.value_growth
+        ,opportunity.name_opportunity_stage
+        ,opportunity.date_created
+        ,opportunity.date_closed
+
+from    fivetran.salesforce.account
+    as account
+
+left join ( select  distinct opportunity.account_id             as id_account
+                    ,opportunity.id                             as id_opportunity
+                    ,opportunity.lead_sales_engineer_c          as id_sales_engineer
+           
+                    ,opportunity.name                           as name_opportunity
+                    ,opportunity.currency_iso_code              as name_fx
+                    ,opportunity_stage.is_closed                as is_closed         
+                    ,opportunity_stage.is_won                   as is_won
+                    ,opportunity_stage.master_label          as name_opportunity_stage
+           
+                    ,to_date( opportunity.created_date )        as date_created
+                    ,to_date( opportunity.close_date )          as date_closed
+                    ,case when opportunity.growth_acv_looker_c is null
+                            then 0
+                        when opportunity.growth_acv_looker_c = 0
+                            then 0
+                        else to_number( opportunity.growth_acv_looker_c, 38, 2 ) 
+                        end as value_growth
+            from    identifier($var_crm_opportunity_table) as opportunity 
+
+            left join   identifier($var_crm_stage_table)        
+                as opportunity_stage    
+                on opportunity.stage_name = opportunity_stage.master_label 
+           
+            where   opportunity.is_deleted != 'TRUE'
+                and opportunity_stage.master_label != 'Duplicate'
+                and opportunity_stage.master_label != 'Re-Market'
+           
+) as opportunity
+on account.id = opportunity.id_account
+
+left join ( select * 
+            from fivetran.salesforce.opportunity_team_member
+            where name = 'Sean Morris' 
+) as team_member
+on opportunity.id_opportunity = team_member.opportunity_id
+
+where   account.is_deleted != 'TRUE'
+    and opportunity.id_opportunity is not null
+    and team_member.name = 'Sean Morris'
+//    and opportunity.is_closed != 'TRUE'
+//    and last_day( dateadd( month, -1, current_date() ) ) < opportunity.date_closed
+//    and ( engineer.name = $var_sales_engineer
+//            or team_member.name = $var_sales_engineer )
+    
+-- REMOVED DEALS WITHOUT GROWTH
+-- FILTER DEALS BY CLOSE DATE
+//    and dateadd( month, 1, date_trunc( year, dateadd( year, 1, current_date() ) ) ) > opportunity.date_closed
+
+order by opportunity.date_closed asc
+;
+
+/*--------------------------------------------------------------------------------
+  STAGE
+--------------------------------------------------------------------------------*/
+
+create or replace table identifier($var_opportunity_stage_table) (
+    stage       string
+    ,stage_sort number
+    ,weight     number(38,2)
+    ,weight_multiplier number(38,2)
+    ,forecast   string
+    ,is_closed  boolean
+    ,is_won     boolean
+);
+
+insert into identifier($var_opportunity_stage_table) ( stage, stage_sort, weight, weight_multiplier, forecast, is_closed, is_won )
+select  master_label,sort_order
+        ,case when is_closed = true then 1 else default_probability/100 end
+        ,case when is_closed = true then -1 else default_probability/100 end
+        ,forecast_category_name,is_closed,is_won
+from identifier($var_crm_stage_table)
+where is_active = true;
+
+create or replace table identifier($var_pipeline_type_table) (
+    type    string
+    ,sort   number(38,0)
+);
+
+insert into identifier($var_pipeline_type_table) ( type, sort )
+    values( 'Beginning', 1 )
+        ,(  'New', 2 )
+        ,(  'Pulled', 3 )
+        ,(  'Increase', 4 )
+        ,(  'Unchange', 5 )
+        ,(  'Decrease', 6 )
+        ,(  'Pushed', 7 )
+        ,(  'Won', 8 )
+        ,(  'Lost', 9 )
+        ,(  'Ommitted', 10 );
+
+-- create source table
+create or replace table identifier($var_opportunity_stream_history_table) (
+    history_id              number      autoincrement
+    ,opportunity_id         string
+    ,account_id             string
+    ,amount                 number
+    ,stage                  string
+    ,date_created           date
+    ,date_closed            date
+    ,timestamp_last_updated timestamp
+    ,metadata$action        string
+    ,metadata$isupdate      string
+    ,metadata$row_id        string
+);
+
+-- insert values for source table
+
+create or replace task stream_task
+    warehouse = smorris_wh
+    schedule = '1 minute'
+    when system$stream_has_data( 'identifier($var_opportunity_stream)' )
+    as
+
+insert into identifier($var_opportunity_stream_history_table) ( 
+    opportunity_id
+    ,account_id
+    ,amount
+    ,stage
+    ,date_created
+    ,date_closed
+    ,timestamp_last_updated
+    ,metadata$action
+    ,metadata$isupdate
+    ,metadata$row_id )
+        
+select 
+    opportunity_id
+    ,account_id
+    ,amount
+    ,stage
+    ,date_created
+    ,date_closed
+    ,current_timestamp()
+    ,metadata$action
+    ,metadata$isupdate
+    ,metadata$row_id 
+from identifier($var_opportunity_stream);
+
+create or replace table pipeline_history( 
+    date                    date
+    ,opportunity_id         string
+    ,account_id             string
+    ,timestamp_last_updated timestamp
+    ,amount                 number(38,2)
+    ,weight                 number(38,2)
+    ,stage                  string
+    ,date_created           date
+    ,date_closed            date
+    ,type                   string 
+);
+
+
+create or replace task pipeline_task
+    warehouse = smorris_wh
+    after stream_task
+    as
+    
+merge into pipeline_history using( 
+with update_deals as(
+    select  old.opportunity_id
+            ,old.account_id
+            ,new.timestamp_last_updated
+            ,old.amount old_amount
+            ,new.amount new_amount
+            ,old_stage.stage old_stage
+            ,new_stage.stage new_stage
+            ,old_stage.weight old_weight
+            ,new_stage.weight new_weight
+            ,old.date_created
+            ,old.date_closed old_date_closed
+            ,new.date_closed new_date_closed
+    from opportunity_stream_history as old 
+    left join opportunity_stage as old_stage
+        on old.stage = old_stage.stage
+    left join ( select * from opportunity_stream_history 
+                where metadata$action = 'INSERT'
+                    and metadata$isupdate = true ) as new
+        on new.metadata$row_id = old.metadata$row_id
+        and ( new.amount != old.amount 
+            or new.stage != old.stage 
+            or new.date_created != old.date_created
+            or new.date_closed != old.date_closed )
+    left join opportunity_stage as new_stage
+        on new.stage = new_stage.stage
+    where   old.metadata$action = 'DELETE'
+        and old.metadata$isupdate = true
+    )
+,delete_deals as(
+    select  history.*
+            ,stage.weight
+    from opportunity_stream_history as history
+    left join opportunity_stage as stage
+        on history.stage = stage.stage
+    where   metadata$action = 'DELETE'
+        and metadata$isupdate = false
+    )
+,insert_deals as(
+    select  history.*
+            ,stage.weight
+    from opportunity_stream_history as history
+    left join opportunity_stage as stage
+        on history.stage = stage.stage
+    where   metadata$isupdate = false
+        and metadata$action = 'INSERT'
+    )
+,new_deals as(
+    select  distinct to_date(timestamp_last_updated) date,opportunity_id,account_id
+            ,case when date_created < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, date_created), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,last_value(amount) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) amount
+            ,last_value(weight) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) weight
+            ,last_value(stage) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) stage
+            ,first_value(date_created) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) date_created
+            ,last_value(date_closed) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) date_closed
+            ,'New'type
+    from(   select  opportunity_id,account_id,timestamp_last_updated
+                ,amount,weight,stage,date_created,date_closed
+            from insert_deals
+            union all
+            select  opportunity_id,account_id,timestamp_last_updated
+                    ,new_amount amount
+                    ,new_weight weight
+                    ,new_stage stage
+                    ,date_created
+                    ,new_date_closed date_closed
+            from update_deals
+            where to_date(timestamp_last_updated) = date_created )
+    )
+,pulled_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id,timestamp_last_updated
+            ,old_amount amount
+            ,old_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Pulled'type
+    from update_deals
+    where   old_date_closed>new_date_closed
+        and to_date(timestamp_last_updated) != date_created
+    )
+,increased_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id,timestamp_last_updated
+            ,new_amount - old_amount amount
+            ,new_weight - old_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Increase'type
+    from update_deals
+    where (old_amount*old_weight)>(new_amount*new_weight)
+        and to_date(timestamp_last_updated) != date_created
+    )
+,decreased_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id,timestamp_last_updated
+            ,new_amount - old_amount amount
+            ,new_weight - old_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Decrease'type
+    from update_deals
+    where (old_amount*old_weight)>(new_amount*new_weight)
+        and to_date(timestamp_last_updated) != date_created
+)
+,pushed_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id,timestamp_last_updated
+            ,new_amount amount
+            ,new_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Pushed'type
+    from update_deals
+    where old_date_closed<new_date_closed
+        and to_date(timestamp_last_updated) != date_created
+    )
+,won_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id
+            ,case when new_date_closed < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, new_date_closed), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,new_amount amount
+            ,new_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Won' type
+    from update_deals
+    where new_stage='Closed Won'
+    union all
+    select  to_date(timestamp_last_updated),opportunity_id,account_id
+            ,case when date_closed < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, date_closed), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,amount,weight,stage,date_created,date_closed
+            ,'Won' type
+    from insert_deals
+    where stage = 'Closed Won'
+)
+,lost_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id
+            ,case when new_date_closed < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, new_date_closed), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,new_amount amount
+            ,new_weight weight
+            ,new_stage
+            ,date_created
+            ,new_date_closed date_closed
+            ,'Lost' type
+    from update_deals
+    where new_stage='Closed Lost'
+    union all
+    select  to_date(timestamp_last_updated),opportunity_id,account_id
+            ,case when date_closed < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, date_closed), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,amount,weight,stage,date_created,date_closed
+            ,stage type
+    from insert_deals
+    where stage = 'Closed Lost'
+)
+,ommitted_deals as(
+    select  to_date(timestamp_last_updated),opportunity_id,account_id
+            ,case when date_closed < to_date(current_timestamp()) then dateadd( day, datediff(day, current_timestamp, date_closed), current_timestamp)
+                else current_timestamp() end timestamp_last_updated
+            ,amount
+            ,weight
+            ,'Ommitted' stage
+            ,date_created
+            ,date_closed
+            ,'Ommitted' type
+    from delete_deals
+)
+,deal_union as( 
+    select * from new_deals union all
+    select * from pulled_deals union all
+    select * from increased_deals union all
+    select * from decreased_deals union all
+    select * from pushed_deals union all
+    select * from won_deals union all
+    select * from lost_deals union all
+    select * from ommitted_deals
+)
+,beginning_deals as(
+    select  dateadd( day, 1, calendar.date )
+            ,account_id
+            ,opportunity_id
+            ,last_value(timestamp_last_updated) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) timestamp_last_updated
+            ,last_value(amount) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) amount
+            ,last_value(weight) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) weight
+            ,last_value(stage) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) stage
+            ,first_value(date_created) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) date_created
+            ,last_value(date_closed) over ( partition by account_id,opportunity_id,to_date(timestamp_last_updated) order by timestamp_last_updated asc ) date_closed
+            ,'Beginning' type 
+    from calendar
+    left join deal_union
+    on calendar.date > to_date(timestamp_last_updated)
+        and calendar.date < date_closed
+    where account_id is not null
+)
+,pipeline_union as(
+    select * from deal_union union all
+    select * from beginning_deals
+)
+select * 
+from pipeline_union
+where   date_closed > '2022-01-31') as history
+    on pipeline_history.opportunity_id = history.opportunity_id
+        and pipeline_history.account_id = history.account_id
+        and pipeline_history.timestamp_last_updated = history.timestamp_last_updated
+        and pipeline_history.amount = history.amount
+        and pipeline_history.weight = history.weight
+        and pipeline_history.stage = history.stage
+        and pipeline_history.date_created = history.date_created
+        and pipeline_history.date_closed = history.date_closed
+        and pipeline_history.type = history.type
+    when not matched 
+        then insert (date, opportunity_id, account_id, timestamp_last_updated, amount, weight, stage, date_created, date_closed, type) 
+        values (history.date, history.opportunity_id, history.account_id, history.timestamp_last_updated, history.amount, history.weight, history.stage, history.date_created, history.date_closed, history.type);
