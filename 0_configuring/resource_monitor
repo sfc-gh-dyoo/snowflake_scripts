@@ -1,0 +1,12 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// CREATE RESOURCE MONITOR
+create resource monitor if not exists trial_rm
+with credit_quota = 400
+    triggers on 50 percent do notify
+    triggers on 75 percent do notify
+    triggers on 90 percent do notify;
+    
+// ACTIVATE RESOURCE MONITOR
+alter account set resource_monitor = account_rm;
