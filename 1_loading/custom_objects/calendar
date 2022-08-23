@@ -1,0 +1,24 @@
+set var_fiscal_offset = 1;
+
+select  dateadd( day, + ( row_number() over ( order by null)), dateadd( year, -10, dateadd( day, -1, date_trunc( year, current_date()))))   date 
+        ,dateadd( month, $var_fiscal_offset, date_trunc( year, dateadd( month, -$var_fiscal_offset, date)))                                 year_date
+        ,year( dateadd( month, -$var_fiscal_offset, date))                                                                                  year_num
+        ,to_number(substring( year_num, 3))                                                                                                 year_num_short
+        ,'FY'||year_num                                                                                                                     year_fiscal
+        ,year(year_date) - year( dateadd( month, -$var_fiscal_offset, current_date()))                                                      year_offset
+        ,dateadd( month, $var_fiscal_offset, date_trunc( quarter, dateadd( month, -$var_fiscal_offset, date)))                              quarter_date
+        ,substring( quarter_date, 0, 7)                                                                                                     quarter_date_short
+        ,quarter( dateadd( month, -$var_fiscal_offset, date))                                                                               quarter_num
+        ,'FQ'||quarter_num                                                                                                                  quarter_fiscal
+        ,quarter_num - quarter( dateadd( month, -$var_fiscal_offset, current_date())) + ( year_offset * 4)                                  quarter_offset
+        ,date_trunc( month, date)                                                                                                           month_date
+        ,substring( month_date, 0, 7)                                                                                                       month_date_short
+        ,month( date)                                                                                                                       month_num
+        ,'FM'||month( dateadd( month, -$var_fiscal_offset, date))                                                                           month_fiscal
+        ,month_num - month( current_date()) + (quarter_offset * 3)                                                                          month_offset
+        ,week( dateadd( month, -$var_fiscal_offset, date))                                                                                  week_num
+        ,dayofyear( dateadd( month, -$var_fiscal_offset, date))                                                                             day_year_num
+        ,dayofmonth( date)                                                                                                                  day_month_num
+        ,dayofweek( date) + 1                                                                                                               day_week_num
+        ,date - current_date()                                                                                                              day_offset
+from    table(generator(rowcount => (365 * 20) + 5 ) ) as calendar;
