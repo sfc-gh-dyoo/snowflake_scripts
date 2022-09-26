@@ -1,0 +1,15 @@
+use role accountadmin;
+
+create database if not exists global_db;
+
+use schema global_db.public;
+
+create table if not exsits global_variables(id string, variable string);
+
+insert into global_variables values('test_value','2022-09-25');
+
+select variable from global_variables where id = 'test_value';
+
+set test_var = (select * from table(result_scan(last_query_id())));
+
+select $test_var;
