@@ -84,7 +84,7 @@ create storage integration if not exists identifier($var_integration)
     storage_aws_role_arn = $var_role_arn
     storage_allowed_locations = ($var_allowed_locations);
 
-// RUN NEXT TWO QUERIES AND COPY RESULT
+// RUN NEXT FIVE QUERIES AND COPY RESULT
 desc integration identifier($var_integration);
 set var_snowflake_user_arn = (select $3 from table(result_scan(last_query_id())) limit 1 offset 4);
 desc integration identifier($var_integration);
