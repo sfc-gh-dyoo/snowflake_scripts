@@ -1,13 +1,62 @@
+// SET CONTEXT
 use role accountadmin;
 
-// SET VARIABLES
-set var_provider = 's3';
-set var_role_arn = '';
-set var_allowed_locations = '';
+// CHANGE VARIABLES
+set var_bucket = 'mybucket1';
+set var_file_folder = '/mypath/my_folder';
+set var_file_type = 'json';
+
+// SET AUTO VARIABLES
+set var_provider = 'S3';
+set var_schema = 'snowpipe_db.'||$var_provider;
+set var_table = $var_schema||'.'||$var_file_type||'_table';
+set var_allowed_locations = $var_provider||'://'||$var_bucket||$var_file_folder||'/';
+set var_integration = $var_provider||'_INT';
+set var_file_format = $var_schema||'.' || $var_file_type || '_format';
+set var_pipe = $var_schema||'.snowpipe_'||$var_provider||'_pipe';
+
+// RUN THE FOLLOWING QUERY FOR THE AND CREATE POLICY IN POLICY JSON EDITOR:
+select 
+'{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:GetObjectVersion"
+            ],
+            "Resource": "arn:aws:s3:::'||$var_bucket||$var_file_folder||'/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": "arn:aws:s3:::'||$var_bucket||'"
+            
+            ,"Condition": {
+                "StringLike": {
+                    "s3:prefix": [
+                        "'||$var_file_folder||'/*"
+                    ]
+                }
+            }
+
+        }
+    ]
+}';
+
+
+// CREATE AWS ROLE AND ASSIGN PREVIOUS CREATE POLICY
+
+// CHANGE ARN VARIABLE BELOW 
+set var_role_arn = 'arn:aws:iam::001234567890:role/myrole';
 
 // CREATE WAREHOUSE
 create warehouse if not exists snowpipe_wh
-with warehouse_size = medium
+with warehouse_size = xsmall
     max_cluster_count = 1
     min_cluster_count = 1
     auto_suspend = 60
@@ -17,15 +66,10 @@ with warehouse_size = medium
 create database if not exists snowpipe_db;
 
 // SET SCHEMA CONTEXT
-set var_schema = 'snowpipe_db.'||$var_provider;
-
 create schema if not exists identifier($var_schema);
-
 use schema identifier($var_schema);
 
 // CREATE TABLE
-set var_table = $var_schema||'.raw_table';
-
 create table if not exists identifier($var_table)(
     row_number          number
     ,file_name           string
@@ -33,36 +77,85 @@ create table if not exists identifier($var_table)(
     ,raw_data            variant);
 
 // CREATE STORAGE INTEGATION
-set var_integration = $var_provider||'_int';
-
 create storage integration if not exists identifier($var_integration)
     type = external_stage
     storage_provider = $var_provider
     enabled = true
     storage_aws_role_arn = $var_role_arn
-    storage_allowed_locations = $var_allowed_locations;
-      
-// CREATE STAGE
-set var_stage = $var_schema||'.raw_stage';
+    storage_allowed_locations = ($var_allowed_locations);
 
-create stage if not exists identifier($var_stage)
+// RUN NEXT TWO QUERIES AND COPY RESULT
+desc integration identifier($var_integration);
+set var_snowflake_user_arn = (select $3 from table(result_scan(last_query_id())) limit 1 offset 4);
+desc integration identifier($var_integration);
+set var_snowflake_external_id = (select $3 from table(result_scan(last_query_id())) limit 1 offset 6);
+
+select
+'{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "'||$var_snowflake_user_arn||'"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "'||$var_snowflake_external_id||'"
+        }
+      }
+    }
+  ]
+}'
+;
+
+// CREATE FILE FORMAT
+create file format if not exists identifier($var_file_format)
+    type = $var_file_type;
+
+// CREATE STAGE
+create stage if not exists raw_stage
     url = $var_allowed_locations
     storage_integration = $var_integration;
 
-// CREATE FILE FORMAT
-set var_file_format = $var_schema||'.json_format';
+// INCREASE WAREHOUS SIZE FOR HISTORICAL COPY
+alter warehouse snowpipe_wh set warehouse_size = xlarge;
 
-create file format if not exists identifier($var_file_format)
-    type = json;
+// COPY HISTORICAL DATA
+copy into identifier($var_table)(row_number,file_name,timestamp_created,raw_data)
+from( select metadata$file_row_number,metadata$filename,current_timestamp(),$1
+    from @raw_stage )
+file_format = (format_name = $var_file_format);
+
+// DECREASE WAREHOUS SIZE AFTER HISTORICAL COPY
+alter warehouse snowpipe_wh set warehouse_size = xsmall;
 
 // CREATE PIPE
-set var_pipe = $var_schema||'.snowpipe_'||$var_provider||'_pipe';
-
 create pipe if not exists identifier($var_pipe)
-auto_ingest = true as
-    copy into identifier($var_table)(row_number,file_name,timestamp_created,raw_data)
-    from( select metadata$file_row_number,metadata$filename,current_timestamp(),$1
-        from @raw_stage )
-file_format = $var_file_format;
+auto_ingest = true
+as
+copy into identifier($var_table)(row_number,file_name,timestamp_created,raw_data)
+from( select metadata$file_row_number,metadata$filename,current_timestamp(),$1
+    from @raw_stage )
+file_format = (format_name = $var_file_format);
 
+// COPY THE ARN CODE FROM NOTIFICATION CHANNEL COLUMN
+show pipes;
+
+// REDIRECT TO S3 BUCKET PAGE AND CREATE AWS S3 EVENT NOTIFICATION
+//  - ALL OBJECTS CREATE EVENTS; SQS QUEUE; ENTER SQS QUEUE ARN
+
+// CHECK THE STATUS OF THE PIPE
+select system$pipe_status($var_pipe)
+
+// PAUSE WAREHOUSE
 alter warehouse snowpipe_wh suspend;
+
+/*
+drop storage integration if exists identifier($var_integration);
+drop pipe if exists identifier($var_pipe);
+drop database if exists snowpipe_db;
+drop warehouse if exists snowpipe_wh;
+*/
