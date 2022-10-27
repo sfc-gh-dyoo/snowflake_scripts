@@ -1,0 +1,43 @@
+// set up department roles
+use role accountadmin;
+
+// select department name and department admin user name
+set var_dep = 'dpm';
+set var_user_admin = 'PEDRO';
+
+set var_dep_db = $var_dep||'_db';
+set var_dep_wh = $var_dep||'_wh';
+set var_admin = $var_dep||'_admin_secret';
+set var_top_secret = $var_dep||'_top_secret';
+set var_secure = $var_dep||'_secure';
+set var_non_secure = $var_dep||'_non_secure';
+set var_current_user = current_user();
+
+create role if not exists identifier($var_admin);
+create database if not exists identifier($var_dep_db);
+create warehouse if not exists identifier($var_dep_wh) with warehouse_size = xsmall;
+
+grant create role on account to role identifier($var_admin);
+grant role identifier($var_admin) to user identifier($var_current_user);
+
+grant usage, operate on warehouse identifier( $var_dep_wh ) to role identifier( $var_admin );
+grant all privileges on database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on all schemas in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on all tables in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on all views in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on all materialized views in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on future tables in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on future views in database identifier( $var_dep_db ) to role identifier( $var_admin );
+grant all privileges on future materialized views in database identifier( $var_dep_db ) to role identifier( $var_admin );
+
+use role identifier($var_admin);
+
+create role if not exists identifier($var_top_secret);
+create role if not exists identifier($var_secure);
+create role if not exists identifier($var_non_secure);
+
+grant role identifier($var_non_secure) to role identifier($var_secure);
+grant role identifier($var_secure) to role identifier($var_top_secret);
+grant role identifier($var_top_secret) to role identifier($var_admin);
+
+grant role identifier($var_non_secure) to user identifier($var_user);
