@@ -1,0 +1,26 @@
+use role accountadmin;
+create warehouse if not exists array_wh;
+use warehouse array_wh;
+create database if not exists test_db;
+create schema if not exists array_schema;
+use schema test_db.array_schema;
+
+create or replace table array_table(
+    array_value array );
+
+insert into array_table
+select parse_json($1)
+from values('[1,2,3,4,5]' )
+        ,('[2,3,4]' )
+        ,('[12,13,14]' )
+        ,('[1,13,14]' )
+        ,( '[1,13,5]' );
+
+create stage if not exists array_unload_stage
+file_format = (type = json);
+
+copy into @array_unload_stage from array_table;
+
+list @array_unload_stage;
+
+select $1 from @array_unload_stage;
