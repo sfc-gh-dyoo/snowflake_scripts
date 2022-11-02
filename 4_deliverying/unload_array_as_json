@@ -14,7 +14,7 @@ from values('[1,2,3,4,5]' )
         ,('[2,3,4]' )
         ,('[12,13,14]' )
         ,('[1,13,14]' )
-        ,( '[1,13,5]' );
+        ,('[1,13,5]' );
 
 create stage if not exists array_unload_stage
 file_format = (type = json);
