@@ -1,0 +1,67 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// CREATE COMPUTE WAREHOUSE
+create or replace warehouse xml_wh
+    with warehouse_size = xsmall;
+
+// SET WAREHOUSE CONTEXT
+use warehouse xml_wh;
+
+// CREATE DATABASE
+create or replace database xml_db;
+
+// SET DATABASE SCHEMA CONTEXT
+use schema xml_db.public;
+
+// CREATE XML FILE FORMAT
+create or replace file format xml_format 
+    type = xml;
+
+// CREATE STAGE TO STORE XML FILES
+create or replace stage xml_stage 
+    file_format = xml_format;
+
+// CREATE TABLE TO LOAD XML DATA
+create or replace table xml_table(
+    raw_data    variant);
+
+// VIEW RAW XML DATA
+select raw_data:"$" from xml_table;
+
+// USE XMLGET TO VIEW DATA PARSED
+select xmlget(raw_data, 'AuctionAnnouncement', 0):"$" from xml_table;
+
+// LATERAL FLATTEN XML TO VIEW AS ROWS
+select auction_announcement.index as auction_contents_index,
+    auction_announcement.value as auction_contents_value
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) xml_doc
+    ,lateral flatten(to_array(xml_doc.value:"$" )) auction_announcement;
+
+// COMBINE LATERAL FLATTEN WITH XML GET TO VIEW COLUMARIZED DATA
+select xmlget(value, 'SecurityType' ):"$" as security_type
+    ,xmlget( value, 'MaturityDate' ):"$" as maturity_date
+    ,xmlget( value, 'OfferingAmount' ):"$" as offering_amount
+    ,xmlget( value, 'MatureSecurityAmount' ):"$" as mature_security_amount
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) auction_announcement;
+
+// CREATE TABLE FOR COLUMNARIZED DATA 
+create or replace table treasury_auction_table(
+    security_type string
+    ,maturity_date string
+    ,offering_amount number
+    ,mature_security_amount number);
+    
+// INSERT COLUMNARIZED DATA
+insert into treasury_auction_table
+select xmlget(value, 'SecurityType' ):"$" as security_type
+    ,xmlget( value, 'MaturityDate' ):"$" as maturity_date
+    ,xmlget( value, 'OfferingAmount' ):"$" as offering_amount
+    ,xmlget( value, 'MatureSecurityAmount' ):"$" as mature_security_amount
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) auction_announcement;
+
+// QUERY COLUMARIZED DATA
+select * from treasury_auction_table;
