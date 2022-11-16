@@ -1,0 +1,39 @@
+// VIEW RAW XML DATA
+select raw_data:"$" from xml_table;
+
+// USE XMLGET TO VIEW DATA PARSED
+select xmlget(raw_data, 'AuctionAnnouncement', 0):"$" from xml_table;
+
+// LATERAL FLATTEN XML TO VIEW AS ROWS
+select auction_announcement.index as auction_contents_index,
+    auction_announcement.value as auction_contents_value
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) xml_doc
+    ,lateral flatten(to_array(xml_doc.value:"$" )) auction_announcement;
+
+// COMBINE LATERAL FLATTEN WITH XML GET TO VIEW COLUMARIZED DATA
+select xmlget(value, 'SecurityType' ):"$" as security_type
+    ,xmlget( value, 'MaturityDate' ):"$" as maturity_date
+    ,xmlget( value, 'OfferingAmount' ):"$" as offering_amount
+    ,xmlget( value, 'MatureSecurityAmount' ):"$" as mature_security_amount
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) auction_announcement;
+
+// CREATE TABLE FOR COLUMNARIZED DATA 
+create or replace table treasury_auction_table(
+    security_type string
+    ,maturity_date string
+    ,offering_amount number
+    ,mature_security_amount number);
+    
+// INSERT COLUMNARIZED DATA
+insert into treasury_auction_table
+select xmlget(value, 'SecurityType' ):"$" as security_type
+    ,xmlget( value, 'MaturityDate' ):"$" as maturity_date
+    ,xmlget( value, 'OfferingAmount' ):"$" as offering_amount
+    ,xmlget( value, 'MatureSecurityAmount' ):"$" as mature_security_amount
+from xml_table
+    ,lateral flatten(to_array(xml_table.raw_data:"$" )) auction_announcement;
+
+// QUERY COLUMARIZED DATA
+select * from treasury_auction_table;
