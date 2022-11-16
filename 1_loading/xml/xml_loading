@@ -1,0 +1,23 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// CREATE COMPUTE WAREHOUSE
+create or replace warehouse xml_wh
+    with warehouse_size = xsmall;
+
+// SET WAREHOUSE CONTEXT
+use warehouse xml_wh;
+
+// CREATE DATABASE
+create or replace database xml_db;
+
+// SET DATABASE SCHEMA CONTEXT
+use schema xml_db.public;
+
+// CREATE XML FILE FORMAT
+create or replace file format xml_format 
+    type = xml;
+
+// CREATE TABLE TO LOAD XML DATA
+create or replace table xml_table(
+    raw_data    variant);
