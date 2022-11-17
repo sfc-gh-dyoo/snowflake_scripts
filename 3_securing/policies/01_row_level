@@ -22,7 +22,7 @@ select * from sample_data.tpch_sf1000.region;
 create or replace table sample_table as
 select c_custkey id
     ,c_name name
-    ,c_address adresss
+    ,c_address addresss
     ,c_phone phone
     ,c_acctbal balance
     ,c_mktsegment market
