@@ -1,113 +1,111 @@
-/*--------------------------------------------------------------------------------
-  DEMO SETUP
---------------------------------------------------------------------------------*/
-
+// SET CONTEXT
 use role accountadmin;
 
-create or replace role row_level_policy_role;
-set var_current_user = current_user();
-grant role row_level_policy_role to user identifier( $var_current_user );
+// CREATE WAREHOUSE
+create or replace warehouse sample_wh;
 
-create or replace warehouse row_level_policy_wh;
-grant usage on warehouse row_level_policy_wh to role row_level_policy_role;
+// SET WAREHOUSE CONTEXT
+use warehouse sample_wh;
 
-create or replace database row_level_policy_db;
-grant all privileges on database row_level_policy_db to role row_level_policy_role;
-grant all privileges on schema row_level_policy_db.public to role row_level_policy_role;
-grant all privileges on all tables in schema row_level_policy_db.public to role row_level_policy_role;
-grant all privileges on future tables in schema row_level_policy_db.public to role row_level_policy_role;
+// CREATE DATABASE
+create or replace database sample_db; 
 
-create or replace role us_analyst;
-grant usage on warehouse row_level_policy_wh to role us_analyst;
-grant usage on database row_level_policy_db to role us_analyst;
-grant usage on schema row_level_policy_db.public to role us_analyst;
-grant role us_analyst to user identifier( $var_current_user );
+// SET SCHEMA CONTEXT
+use schema sample_db.public;
 
-create or replace role uk_analyst;
-grant usage on warehouse row_level_policy_wh to role uk_analyst;
-grant usage on database row_level_policy_db to role uk_analyst;
-grant usage on schema row_level_policy_db.public to role uk_analyst;
-grant role uk_analyst to user identifier( $var_current_user );
+// VIEW SAMPLE DATA
+select * from sample_data.tpch_sf1000.customer limit 100;
+select * from sample_data.tpch_sf1000.nation;
+select * from sample_data.tpch_sf1000.region;
 
-create or replace role eu_analyst;
-grant usage on warehouse row_level_policy_wh to role eu_analyst;
-grant usage on database row_level_policy_db to role eu_analyst;
-grant usage on schema row_level_policy_db.public to role eu_analyst;
-grant role eu_analyst to user identifier( $var_current_user );
+// CREATE JOINED TABLE
+create or replace table sample_table as
+select c_custkey id
+    ,c_name name
+    ,c_address adresss
+    ,c_phone phone
+    ,c_acctbal balace
+    ,c_mktsegment market
+    ,n_name nation
+    ,r_name region
+from sample_data.tpch_sf1000.customer
+    ,sample_data.tpch_sf1000.nation
+    ,sample_data.tpch_sf1000.region
+where customer.c_nationkey = nation.n_nationkey
+    and nation.n_regionkey = region.r_regionkey
+    and region.r_name in ('AMERICA','EUROPE','ASIA');
 
+// VIEW TABLE
+select * from sample_table limit 100;
 
-use role row_level_policy_role;
-use warehouse row_level_policy_wh;
-use schema row_level_policy_db.public;
+// CREATE REGION SPECIFIC ROLES
+create or replace role america_role;
+create or replace role asia_role;
+create or replace role europe_role;
 
--- create entitlement table
+// CREATE ENTITLEMENTS TABLE
 create or replace table entitlements_table(
-    role    string 
-    ,region string );
-
--- insert values for entitlement table
+    role string
+    ,region string);
+    
+// INSERT ENTITLEMNTS DATA
 insert into entitlements_table
-    values(  'US_ANALYST', 'US')
-        ,( 'UK_ANALYST', 'UK')
-        ,( 'EU_ANALYST', 'EU');
+    values('america_role','AMERICA')
+        ,('asia_role','ASIA')
+        ,('europe_role','EUROPE');
 
--- create transactions table
-create or replace table base_data_table(
-    id              number
-    ,region         string
-    ,type           string
-    ,amount         number
-    ,account_number string
-    ,balance        number );
-
--- insert values for transactions table
-insert into base_data_table
-    values(  1, 'US', 'Deposit', 9387, '3451-8931-9310', 14482 )
-        ,(2, 'UK', 'Transfer', 2485, '7831-4328-1912', 10562 )
-        ,(3, 'EU', 'Withdrawal', 5855, '4791-5882-9046', 4739 );
-
--- grant permissions to roles
-grant select on table base_data_table to role us_analyst; 
-grant select on table base_data_table to role uk_analyst; 
-grant select on table base_data_table to role eu_analyst;
-
-/*--------------------------------------------------------------------------------
-  DEMO BEGINS
---------------------------------------------------------------------------------*/
-
+// VIEW ENTITLEMENTS DATA
 select * from entitlements_table;
-select * from base_data_table;
 
--- create row level policy
-create or replace row access policy region_policy as (region_value varchar) returns boolean ->
- exists (
- select 1 from entitlements_table
- where role ilike current_role()
- and region ilike region_value); 
- 
--- apply the row level policy
-alter table base_data_table add row access policy region_policy on (region);
+// CREATE ROW LEVEL POLICY
+create or replace row access policy region_policy as (region_value varchar) 
+returns boolean -> exists( 
+    select 1 
+    from entitlements_table
+    where role ilike current_role()
+        and region ilike region_value
+); 
 
--- test out selecting the table with role level policies using different users
-select * from base_data_table;
+// APPLY ROW LEVEL POLICY
+alter table sample_table add row access policy region_policy on (region);
 
-use role us_analyst;
-select * from base_data_table;
+// GRANT REGION ROLES WAREHOUSE PRIVILEGES
+grant usage on warehouse sample_wh to role america_role;
+grant usage on warehouse sample_wh to role europe_role;
+grant usage on warehouse sample_wh to role asia_role;
 
-use role uk_analyst;
-select * from base_data_table;
+// GRANT REGION ROLES DATABASE PRIVILEGES
+grant usage on database sample_db to role america_role;
+grant usage on database sample_db to role europe_role;
+grant usage on database sample_db to role asia_role;
 
-use role eu_analyst;
-select * from base_data_table;
+// GRANT REGION ROLES SCHEMA PRIVILEGES
+grant usage on schema public to role america_role;
+grant usage on schema public to role europe_role;
+grant usage on schema public to role asia_role;
 
-/*--------------------------------------------------------------------------------
-  DEMO CLEANUP
---------------------------------------------------------------------------------*/
+// GRANT REGION ROLES TABLE PRIVILEGES
+grant select on table sample_table to role america_role;
+grant select on table sample_table to role europe_role;
+grant select on table sample_table to role asia_role;
 
-use role accountadmin;
-drop database if exists row_level_policy_db;
-drop warehouse if exists row_level_policy_wh;
-drop role if exists row_level_policy_role;
-drop role if exists us_analyst;
-drop role if exists uk_analyst;
-drop role if exists eu_banker;
+// GRANT ROLES TO ROLES
+grant role america_role to role sysadmin;
+grant role europe_role to role sysadmin;
+grant role asia_role to role sysadmin;
+
+// TEST ROLES
+use role america_role;
+select * from sample_table where region = 'AMERICA';
+select * from sample_table where region = 'EUROPE';
+select * from sample_table where region = 'ASIA';
+
+use role europe_role;
+select * from sample_table where region = 'AMERICA';
+select * from sample_table where region = 'EUROPE';
+select * from sample_table where region = 'ASIA';
+
+use role asia_role;
+select * from sample_table where region = 'AMERICA';
+select * from sample_table where region = 'EUROPE';
+select * from sample_table where region = 'ASIA';
