@@ -24,7 +24,7 @@ select c_custkey id
     ,c_name name
     ,c_address adresss
     ,c_phone phone
-    ,c_acctbal balace
+    ,c_acctbal balance
     ,c_mktsegment market
     ,n_name nation
     ,r_name region
