@@ -1,4 +1,4 @@
-// SET CONTEXT
+// SET ROLE CONTEXT
 use role accountadmin;
 
 // CREATE WAREHOUSE
@@ -50,9 +50,9 @@ create or replace table entitlements_table(
     
 // INSERT ENTITLEMNTS DATA
 insert into entitlements_table
-    values('america_role','AMERICA')
-        ,('asia_role','ASIA')
-        ,('europe_role','EUROPE');
+    values('AMERICA_ROLE','AMERICA')
+        ,('ASIA_ROLE','ASIA')
+        ,('EUROPE_ROLE','EUROPE');
 
 // VIEW ENTITLEMENTS DATA
 select * from entitlements_table;
@@ -62,7 +62,7 @@ create or replace row access policy region_policy as (region_value varchar)
 returns boolean -> exists( 
     select 1 
     from entitlements_table
-    where role ilike current_role()
+    where startswith(current_role(),role)
         and region ilike region_value
 ); 
 
