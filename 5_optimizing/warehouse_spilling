@@ -1,0 +1,16 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
+
+// LIST OF WAREHOUSES AND COUNT OF QUERIES BY SPILLING
+select warehouse_name
+    ,warehouse_size
+    ,(round((bytes_scanned/1024/1024/1024),2)) gb_scanned
+    ,(round((bytes_spilled_to_remote_storage/1024/1024/1024),2)) gb_spilled
+    ,(round((gb_spilled/gb_scanned),4)) spilling_read_ratio
+    ,count(distinct query_id) count_queries
+from query_history
+where bytes_spilled_to_remote_storage > 0
+group by 1,2,3,4,5
+order by 4 desc;
