@@ -32,3 +32,10 @@ grant all on database identifier( $var_workload_db ) to role identifier( $var_wo
 use role identifier( $var_workload_role );
 use warehouse identifier( $var_workload_wh );
 use database identifier( $var_workload_db );
+
+/*
+// IF MISTAKE WAS MADE RUN THE FOLLOWING
+use role accountadmin;
+drop role identifier( $var_workload_role );
+drop warehouse identifier( $var_workload_wh );
+drop database identifier( $var_workload_db );
