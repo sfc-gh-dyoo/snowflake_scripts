@@ -1,0 +1,34 @@
+// SET ROLE TO ACCOUNTADMIN
+use role accountadmin;
+
+// SET NAME OF WORKLOAD
+set var_workload = 'test';
+
+// SET NAME OF OBJECTS
+set var_workload_role = $var_workload || '_role';
+set var_workload_wh = $var_workload || '_wh';
+set var_workload_db = $var_workload || '_db';
+set var_current_user = current_user();
+
+// CREATE ROLE
+create or replace role identifier( $var_workload_role );
+
+// GRANT ROLE TO ROLE HIERARCHY 
+grant role identifier( $var_workload_role ) to role sysadmin;
+
+// CREATE WAREHOUSE
+create or replace warehouse identifier( $var_workload_wh );
+
+// GRANT WAREHOUSE TO ROLE
+grant usage on warehouse identifier( $var_workload_wh ) to role identifier( $var_workload_role );
+
+// CREATE DATABASE
+create or replace database identifier( $var_workload_db );
+
+// GRANT ALL PRIVILEDGES ON DATABASE TO ROLE
+grant all on database identifier( $var_workload_db ) to role identifier( $var_workload_role );
+
+// TEST NEW ENVIRONMENT
+use role identifier( $var_workload_role );
+use warehouse identifier( $var_workload_wh );
+use database identifier( $var_workload_db );
