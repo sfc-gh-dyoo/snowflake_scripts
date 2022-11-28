@@ -10,6 +10,7 @@ select warehouse_name
     ,(round(sum(((bytes_scanned/1024/1024/1024)*percentage_scanned_from_cache))/sum((bytes_scanned/1024/1024/1024)),4)) gb_percent_from_cache
     ,count(distinct query_id) count_queries
 from query_history
-where bytes_scanned > 0
+where to_date(start_time) > dateadd('days', -90, current_date)
+    and bytes_scanned > 0
 group by 1
 order by 5 asc;
