@@ -18,17 +18,15 @@ use schema sample_db.public;
 create or replace table customer as
     select * 
     from sample_data.tpch_sf1000.customer 
-    sample (90);
+    sample (99);
 
 create or replace table nation as
     select * 
-    from sample_data.tpch_sf1000.nation 
-    sample (90);
+    from sample_data.tpch_sf1000.nation;
     
 create or replace table region as
     select * 
-    from sample_data.tpch_sf1000.region 
-    sample (90);
+    from sample_data.tpch_sf1000.region;
     
 
 // CREATE DYNAMIC TABLE
@@ -58,16 +56,7 @@ insert into customer
     from sample_data.tpch_sf1000.customer
     where c_custkey not in (select c_custkey from customer);
 
-insert into nation
-    select * 
-    from sample_data.tpch_sf1000.nation
-    where n_nationkey not in (select n_nationkey from nation);
-    
-insert into region
-    select * 
-    from sample_data.tpch_sf1000.region
-    where r_regionkey not in (select r_regionkey from region);
-
+// MONITOR REFRESHES
 select name
     ,state
     ,error_code
@@ -77,9 +66,6 @@ select name
     ,refresh_end_time
 from table(information_schema.dynamic_table_refresh_history(name_prefix => 'SAMPLE_DB.PUBLIC.'))
 order by name, refresh_version;
-
-select *
-from table(information_schema.dynamic_table_refresh_history);
 
 /* CLEAN UP
 drop database sample_db;
