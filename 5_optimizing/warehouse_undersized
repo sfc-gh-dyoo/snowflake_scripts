@@ -11,6 +11,7 @@ select warehouse_name
     ,(round((gb_spilled/gb_scanned),4)) spilling_read_ratio
     ,count(distinct query_id) count_queries
 from query_history
-where bytes_spilled_to_remote_storage > 0
+where to_date(start_time) > dateadd('days', -90, current_date)
+    and bytes_spilled_to_remote_storage > 0
 group by 1,2,3,4,5
 order by 4 desc;
