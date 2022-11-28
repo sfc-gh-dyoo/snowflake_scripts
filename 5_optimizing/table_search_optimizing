@@ -1,0 +1,12 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
+
+// LIST OF TABLES SEARCH OPTIMIZING BY COST
+select table_name
+    ,sum(credits_used) sum_credits
+from materialized_view_refresh_history
+where to_date(start_time) > dateadd('days', -90, current_date)
+group by 1
+order by 2 desc;
