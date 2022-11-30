@@ -33,14 +33,13 @@ from sample_data.tpch_sf1000.customer
     ,sample_data.tpch_sf1000.region
 where customer.c_nationkey = nation.n_nationkey
     and nation.n_regionkey = region.r_regionkey
-    and region.r_name in ('AMERICA','EUROPE','ASIA');
+    and region.r_name in ('AMERICA','EUROPE');
 
 // VIEW TABLE
 select * from sample_table limit 100;
 
 // CREATE REGION SPECIFIC ROLES
 create or replace role america_role;
-create or replace role asia_role;
 create or replace role europe_role;
 
 // CREATE ENTITLEMENTS TABLE
@@ -51,7 +50,6 @@ create or replace table entitlements_table(
 // INSERT ENTITLEMNTS DATA
 insert into entitlements_table
     values('AMERICA_ROLE','AMERICA')
-        ,('ASIA_ROLE','ASIA')
         ,('EUROPE_ROLE','EUROPE');
 
 // VIEW ENTITLEMENTS DATA
@@ -72,40 +70,28 @@ alter table sample_table add row access policy region_policy on (region);
 // GRANT REGION ROLES WAREHOUSE PRIVILEGES
 grant usage on warehouse sample_wh to role america_role;
 grant usage on warehouse sample_wh to role europe_role;
-grant usage on warehouse sample_wh to role asia_role;
 
 // GRANT REGION ROLES DATABASE PRIVILEGES
 grant usage on database sample_db to role america_role;
 grant usage on database sample_db to role europe_role;
-grant usage on database sample_db to role asia_role;
 
 // GRANT REGION ROLES SCHEMA PRIVILEGES
 grant usage on schema public to role america_role;
 grant usage on schema public to role europe_role;
-grant usage on schema public to role asia_role;
 
 // GRANT REGION ROLES TABLE PRIVILEGES
 grant select on table sample_table to role america_role;
 grant select on table sample_table to role europe_role;
-grant select on table sample_table to role asia_role;
 
 // GRANT ROLES TO ROLES
 grant role america_role to role sysadmin;
 grant role europe_role to role sysadmin;
-grant role asia_role to role sysadmin;
 
 // TEST ROLES
 use role america_role;
 select * from sample_table where region = 'AMERICA';
 select * from sample_table where region = 'EUROPE';
-select * from sample_table where region = 'ASIA';
 
 use role europe_role;
 select * from sample_table where region = 'AMERICA';
 select * from sample_table where region = 'EUROPE';
-select * from sample_table where region = 'ASIA';
-
-use role asia_role;
-select * from sample_table where region = 'AMERICA';
-select * from sample_table where region = 'EUROPE';
-select * from sample_table where region = 'ASIA';
