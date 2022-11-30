@@ -10,7 +10,6 @@ use schema sample_db.public;
 // CREATE REGION SPECIFIC MASKED ROLES
 create or replace role america_role_masked;
 create or replace role europe_role_masked;
-create or replace role asia_role_masked;
 
 // CREATE MASKING POLICY FOR STRINGS
 create or replace masking policy mask_string as
@@ -27,27 +26,22 @@ alter table sample_table modify
 // GRANT REGION ROLES WAREHOUSE PRIVILEGES
 grant usage on warehouse sample_wh to role america_role_masked;
 grant usage on warehouse sample_wh to role europe_role_masked;
-grant usage on warehouse sample_wh to role asia_role_masked;
 
 // GRANT REGION ROLES DATABASE PRIVILEGES
 grant usage on database sample_db to role america_role_masked;
 grant usage on database sample_db to role europe_role_masked;
-grant usage on database sample_db to role asia_role_masked;
 
 // GRANT REGION ROLES SCHEMA PRIVILEGES
 grant usage on schema public to role america_role_masked;
 grant usage on schema public to role europe_role_masked;
-grant usage on schema public to role asia_role_masked;
 
 // GRANT REGION ROLES TABLE PRIVILEGES
 grant select on table sample_table to role america_role_masked;
 grant select on table sample_table to role europe_role_masked;
-grant select on table sample_table to role asia_role_masked;
 
 // GRANT MASKED ROLES TO PARENT ROLES
 grant role america_role_masked to role america_role;
 grant role europe_role_masked to role europe_role;
-grant role asia_role_masked to role asia_role;
 
 // TEST ROLES
 use role america_role_masked;
@@ -60,15 +54,6 @@ from sample_table
 group by 1,2;
 
 use role europe_role_masked;
-select region
-    ,market
-    ,count(distinct id) count_customer
-    ,sum(balance) sum_balance
-    ,round((sum_balance/count_customer),2) avg_customer_balance
-from sample_table
-group by 1,2;
-
-use role asia_role_masked;
 select region
     ,market
     ,count(distinct id) count_customer
