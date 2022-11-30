@@ -47,7 +47,7 @@ from customer
     ,region
 where customer.c_nationkey = nation.n_nationkey
     and nation.n_regionkey = region.r_regionkey
-    and region.r_name in ('AMERICA','EUROPE','ASIA');
+    and region.r_name in ('AMERICA','EUROPE');
 
 
 // INSERT NEW SAMPLE DATA
