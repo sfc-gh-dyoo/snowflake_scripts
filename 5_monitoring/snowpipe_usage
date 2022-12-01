@@ -1,0 +1,15 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
+
+// LIST OF PIPES BY CREDITS AND FILE SIZE
+select pipe_name
+    ,sum(credits_used) sum_credits
+    ,round(sum(bytes_inserted/1024/1024),2) mbs_inserted
+    ,round(sum(files_inserted),2) files_inserted
+    ,round((sum(bytes_inserted/1024/1024)/sum(files_inserted)),2) average_file_size
+from pipe_usage_history
+where to_date(start_time) > dateadd('days', -90, current_date)
+group by 1
+order by 2 desc;

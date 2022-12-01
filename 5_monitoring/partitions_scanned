@@ -1,0 +1,16 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
+
+// LIST OF USERS AND WAREHOUSES SCANNING PARTITIONS
+select user_name
+    ,warehouse_name
+    ,(round(sum(partitions_scanned),2)) partitions_scanned
+    ,(round(sum(partitions_total),2)) partitions_total
+    ,(round(sum(partitions_scanned)/sum(partitions_total),4)) percent_partitions_scanned
+from  query_history
+where  to_date(start_time) > dateadd('days', -90, current_date)
+    and partitions_total > 0
+group by 1,2
+order by 5 desc;

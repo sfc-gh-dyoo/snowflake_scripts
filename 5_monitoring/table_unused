@@ -1,0 +1,24 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
+
+// LIST OF TABLES NOT BEING ACCESSED
+with tables_accessed as(
+    select distinct f1.value:objectId::string as table_id
+        ,f1.value:objectName::string as table_name
+    from access_history
+    ,lateral flatten(base_objects_accessed) f1
+    where f1.value:objectDomain::string='Table'
+        and f1.value:objectId is not null
+        and query_start_time >= dateadd('day', -90, current_timestamp())
+)
+,tables_all as(
+    select table_id::integer as table_id
+        ,table_catalog||'.'||table_schema||'.'||table_name table_name  
+    from tables
+    where deleted is null
+)
+select * 
+from tables_all
+where tables_all.table_id not in (select table_id from tables_accessed);
