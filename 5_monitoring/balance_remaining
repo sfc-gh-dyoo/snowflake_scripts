@@ -1,0 +1,8 @@
+use role accountadmin;
+create warehouse if not exists compute_wh;
+alter warehouse compute_wh set warehouse_size = xsmall;
+
+select rbd.*
+from snowflake.organization_usage.remaining_balance_daily rbd
+left join (select max(date) date from snowflake.organization_usage.remaining_balance_daily) rbdl
+where rbd.date = rbdl.date;
