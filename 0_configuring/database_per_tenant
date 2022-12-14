@@ -1,0 +1,72 @@
+use role accountadmin;
+
+// SET CUSTOMER NAME AND PASSWORD VARIABLE
+set var_customer = 'customer_name';
+set var_password = 'Password123!';
+
+
+// RUN ALL THE CODE BELOW
+
+
+// SET OBJECT VARIABLES
+set var_user = $var_customer || '_user';
+set var_role = $var_customer || '_role';
+set var_query_wh = $var_customer || '_looker_wh';
+set var_etl_wh = $var_customer || '_etl_wh';
+set var_db = $var_customer || '_db';
+set var_schema_ingest = $var_db || '.ingest';
+set var_schema_prod = $var_db || '.prod';
+set var_schema_public = $var_db || '.public';
+set var_table = $var_schema || '.data';
+
+
+// CREATE WAREHOUSES
+create warehouse if not exists identifier( $var_query_wh )
+with warehouse_size = small
+    auto_suspend = 600
+    max_cluster_count = 10;
+    
+create warehouse if not exists identifier( $var_etl_wh )
+with warehouse_size = small
+    auto_suspend = 60
+    max_cluster_count = 10;
+    
+use warehouse identifier( $var_etl_wh );
+
+
+// CREATE DATABASE
+create database if not exists identifier( $var_db );
+use database identifier( $var_db );
+
+
+// CREATE SCHEMAS
+create schema if not exists identifier($var_schema_ingest);
+create schema if not exists identifier($var_schema_prod);
+drop schema if exists identifier($var_schema_public);
+
+
+// CREATE ROLE
+create role if not exists identifier( $var_role );
+
+
+// GRANT ROLE PERMISSIONS
+grant role identifier( $var_role ) to role accountadmin;
+grant usage on warehouse identifier( $var_query_wh ) to role identifier( $var_role );
+grant usage on database identifier( $var_db ) to role identifier( $var_role );
+grant usage on schema identifier( $var_schema_prod ) to role identifier( $var_role );
+grant select on all tables in schema identifier( $var_schema_prod ) to role identifier( $var_role );
+grant select on future tables in schema identifier( $var_schema_prod ) to role identifier( $var_role );
+
+
+// CREATE USER
+create user if not exists identifier($var_user)
+    password = $var_password
+    default_role = $var_role
+    default_warehouse = $var_query_wh
+    must_change_password = false;
+
+
+// TEST ROLE, WAREHOUSE, DATABASE, SCHEMA
+use role identifier( $var_role );
+use warehouse identifier( $var_query_wh );
+use schema identifier( $var_schema_prod );
