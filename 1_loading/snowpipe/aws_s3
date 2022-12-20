@@ -34,7 +34,7 @@ create stage if not exists csv_stage
     storage_integration = s3_int
     file_format = ( format_name = 'csv_format' );
 
-// LIST JSON FILES FROM STAGE
+// LIST CSV FILES FROM STAGE
 list @csv_stage;
 
 // CREATE CSV TABLE(S)
@@ -48,10 +48,11 @@ create or replace table <table_name_1>(
     ,....);
 
 // LOAD CSV FILE
-copy into raw_json
-select metadata$filename, metadata$file_row_number
+copy into <table_name_1>
+from( select metadata$filename, metadata$file_row_number
         ,$1,$2,$3,$n.....
-from @csv_stage
+    from @csv_stage )
+pattern='.*<file_name_1>.*[.]csv[.]gz';
 
 
 // CREATE JSON FILE FORMAT
@@ -75,5 +76,6 @@ create or replace table raw_json(
 
 // LOAD JSON FILES
 copy into raw_json
-select metadata$filename, metadata$file_row_number, $1
-from @json_stage
+from( select metadata$filename, metadata$file_row_number, $1
+    from @json_stage )
+pattern='.*/.*/.*[.]json[.]gz';
