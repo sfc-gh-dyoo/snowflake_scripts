@@ -4,10 +4,7 @@ use role accountadmin;
 set var_role = '<ROLE_NAME>';
 set var_database = '<DATABASE_NAME>';
 
-set var_current_user = current_user();
-
 grant role identifier( $var_role ) to role accountadmin;
-grant role identifier( $var_role ) to user identifier( $var_current_user );
 grant all privileges on database identifier( $var_database ) to role identifier( $var_role );
 grant all privileges on database identifier( $var_database ) to role identifier( $var_role );
 grant all privileges on all tables in database identifier( $var_database ) to role identifier( $var_role );
@@ -16,3 +13,10 @@ grant all privileges on all materialized views in database identifier( $var_data
 grant all privileges on future tables in database identifier( $var_database ) to role identifier( $var_role );
 grant all privileges on future views in database identifier( $var_database ) to role identifier( $var_role );
 grant all privileges on future materialized views in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future sequences in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future procedures in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future functions in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future stages in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future pipes in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future streams in database identifier( $var_database ) to role identifier( $var_role );
+grant all privileges on future tasks in database identifier( $var_database ) to role identifier( $var_role );
