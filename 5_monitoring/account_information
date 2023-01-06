@@ -1,0 +1,2 @@
+select distinct organization_name, contract_number, account_name, account_locator, region, service_level
+from snowflake.organization_usage.usage_in_currency_daily;
