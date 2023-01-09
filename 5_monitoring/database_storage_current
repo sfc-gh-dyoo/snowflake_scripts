@@ -1,0 +1,8 @@
+select database_id||'-'||database_name database_name
+    ,usage_date change_date
+    ,round(sum(average_database_bytes/1024/1024/1024),4) storage_gb
+    ,round(sum(average_failsafe_bytes/1024/1024/1024),4) failsafe_gb
+from snowflake.account_usage.database_storage_usage_history
+where usage_date = current_date
+group by 1,2
+order by 1,2;
