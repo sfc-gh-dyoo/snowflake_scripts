@@ -52,7 +52,7 @@ copy into <table_name_1>
 from( select metadata$filename, metadata$file_row_number
         ,$1,$2,$3,$n.....
     from @csv_stage )
-pattern='.*<file_name_1>.*[.]csv[.]gz';
+pattern='*.csv*';
 
 
 // CREATE JSON FILE FORMAT
@@ -78,4 +78,4 @@ create or replace table raw_json(
 copy into raw_json
 from( select metadata$filename, metadata$file_row_number, $1
     from @json_stage )
-pattern='.*/.*/.*[.]json[.]gz';
+pattern='*.json*';
