@@ -1,0 +1,60 @@
+use role accountadmin;
+create or replace warehouse sample_wh;
+create or replace database sample_db;
+use schema sample_db.public;
+
+// CREATE ENCRYPTED TABLE
+create or replace table encrypted_table(
+    user_name  string
+    ,user_password binary
+);
+
+// INSERT SAMPLE DATA
+insert into encrypted_table(
+    user_name
+    ,user_password
+)
+select 'sample_username'
+    ,encrypt('sample_password','sample_passphrase')
+;
+
+// SET ENCRYPTION PASSPHRASES
+set var_passphrase = 'sample_passphrase';
+
+// SELECT DATA WITH ENCRYPTION
+select user_name
+    ,user_password encrypted_password
+    ,to_varchar(
+        decrypt( 
+            user_password 
+            ,$var_passphrase -- VARIABLE 1 SET
+            ) 
+        ,'utf-8') decrypted_password
+from encrypted_table;
+
+// CREATE VIEW THAT REQUIRES PASSPHRASE
+create or replace secure view decrypted_view as
+select user_name
+    ,user_password encrypted_password
+    ,to_varchar(
+        decrypt( 
+            user_password 
+            ,$var_passphrase -- VARIABLE 1 SET
+            ) 
+        ,'utf-8') decrypted_password
+from encrypted_table;
+
+// VIEW DATA DECRYPTED
+select * from decrypted_view;
+
+// CHANGE PASSPHRASES
+set var_passphrase = 'dummy_passphrase';
+
+// TRY TO VIEW DATA...IT FAILS
+select * from decrypted_view;
+
+// CHANGE PASSWORDS BACK
+set var_passphrase = 'sample_passphrase';
+
+// VIEW DATA DECRYPTED
+select * from decrypted_view;
