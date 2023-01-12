@@ -1,0 +1,14 @@
+use role accountadmin;
+
+set var_current_user = current_user();
+
+grant role orgadmin to user identifier($var_current_user);
+
+use role orgadmin;
+
+create account <ACCOUNT_NAME>
+    admin_name = <USER_NAME>
+    admin_password = '<USER_PASSWORD>'
+    email = <USER_EMAIL_ADDRESS>
+    edition = <STANDARD/ENTERPRISE/BUSINESS_CRITICAL>
+    region = aws_us_east_1;
