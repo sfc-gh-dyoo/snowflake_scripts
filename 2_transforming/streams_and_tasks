@@ -1,0 +1,126 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// CREATE WAREHOUSE
+create or replace warehouse stream_wh with warehouse_size = medium;
+create or replace warehouse sample_wh with warehouse_size = medium;
+
+// SET WAREHOUSE CONTEXT
+use warehouse sample_wh;
+
+// CREATE DATABASE
+create or replace database sample_db; 
+
+// SET SCHEMA CONTEXT
+use schema sample_db.public;
+
+// CREATE SAMPLE DATA
+create or replace table nation as
+select * 
+from sample_data.tpch_sf10.nation;
+    
+create or replace table region as
+select * 
+from sample_data.tpch_sf10.region;
+    
+create or replace table customer as
+select * 
+from sample_data.tpch_sf10.customer 
+sample (99);
+
+// CREATE JOIN VIEW
+create or replace view join_view as
+select c_custkey id
+    ,c_name name
+    ,c_address address
+    ,c_phone phone
+    ,c_acctbal balance
+    ,c_mktsegment market
+    ,n_name nation
+    ,r_name region
+from customer
+    ,nation
+    ,region
+where customer.c_nationkey = nation.n_nationkey
+    and nation.n_regionkey = region.r_regionkey
+    and region.r_name in ('AMERICA','EUROPE');
+
+// CREATE STREAM ON JOIN VIEW
+create or replace stream join_stream on view join_view;
+
+// CREATE DOWNSTREAM TABLE
+create or replace table downstream_table as
+select * from join_view;
+
+// INSERT NEW CUSTOMER DATA
+insert into customer
+    select * 
+    from sample_data.tpch_sf10.customer
+    where c_custkey not in (select c_custkey from customer);
+
+// MONITOR REFRESHES
+select * from join_stream;
+
+// UPDATE DOWNSTREAM TABLE
+merge into downstream_table d
+using join_stream j
+on d.id = j.id
+when matched and metadata$isupdate = true and metadata$action = 'INSERT'
+    then update set d.name = j.name
+        ,d.address = j.address
+        ,d.phone = j.phone
+        ,d.balance = j.balance
+        ,d.market = j.market
+        ,d.nation = j.nation
+        ,d.region = j.region
+when matched and metadata$isupdate = false and metadata$action = 'DELETE' 
+    then delete
+when not matched and metadata$isupdate = false and metadata$action = 'INSERT' 
+    then insert(id,name,address,phone,balance,market,nation,region)
+        values(id,name,address,phone,balance,market,nation,region);
+
+// VIEW TRUNCATED STREAM
+select * from join_stream;
+
+// CHECK THAT ROW COUNTS MATCH
+select count(*) from downstream_table;
+select count(*) from join_view;
+
+// CHECK FOR ANY DIFFERENCES
+select * from downstream_table,join_view 
+where downstream_table.id != join_view.id;
+
+// AUTOMATE CONTINOUS UPDATES WITH TASK
+create or replace task stream_task
+    warehouse = stream_wh
+    schedule = '60 minutes'
+    when system$stream_has_data('join_stream')
+    as
+    merge into downstream_table d
+    using join_stream j
+    on d.id = j.id
+    when matched and metadata$isupdate = true and metadata$action = 'INSERT'
+        then update set d.name = j.name
+            ,d.address = j.address
+            ,d.phone = j.phone
+            ,d.balance = j.balance
+            ,d.market = j.market
+            ,d.nation = j.nation
+            ,d.region = j.region
+    when matched and metadata$isupdate = false and metadata$action = 'DELETE' 
+        then delete
+    when not matched and metadata$isupdate = false and metadata$action = 'INSERT' 
+        then insert(id,name,address,phone,balance,market,nation,region)
+            values(id,name,address,phone,balance,market,nation,region);
+
+// TURN TASK ON
+alter task stream_task resume;
+ 
+// CHECK TASK IS ACTIVE
+show tasks;
+
+/* CLEAN UP
+use role accountadmin;
+drop database if exists sample_db;
+drop warehouse if exists stream_wh;
+drop warehouse if exists sample_wh;
