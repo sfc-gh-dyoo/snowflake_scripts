@@ -1,8 +1,0 @@
-use role accountadmin;
-create warehouse if not exists compute_wh;
-alter warehouse compute_wh set warehouse_size = xsmall;
-use schema snowflake.organization_usage;
-
-select *
-from usage_in_currency_daily
-where usage_date > dateadd(month,-6,current_date());

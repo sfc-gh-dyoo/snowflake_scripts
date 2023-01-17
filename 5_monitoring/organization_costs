@@ -1,0 +1,33 @@
+// SET CONTEXT
+use role accountadmin;
+create warehouse if not exists compute_wh;
+alter warehouse compute_wh set warehouse_size = xsmall;
+use schema snowflake.organization_usage;
+
+// DAILY
+select contract_number
+    ,organization_name
+    ,account_name
+    ,account_locator
+    ,region
+    ,service_level
+    ,date_trunc(day,usage_date) date_day
+    ,usage_type
+    ,sum(usage) credits_consumed
+    ,sum(usage_in_currency) dollars_consumed
+from usage_in_currency_daily
+group by 1,2,3,4,5,6,7,8;
+
+// MONTHLY
+select contract_number
+    ,organization_name
+    ,account_name
+    ,account_locator
+    ,region
+    ,service_level
+    ,date_trunc(month,usage_date) date_month
+    ,usage_type
+    ,sum(usage) credits_consumed
+    ,sum(usage_in_currency) dollars_consumed
+from usage_in_currency_daily
+group by 1,2,3,4,5,6,7,8;
