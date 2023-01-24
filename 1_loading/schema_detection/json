@@ -1,0 +1,33 @@
+use role accountadmin;
+use warehouse compute_wh;
+
+create or replace database sample_db;
+
+use schema sample_db.public;
+
+create or replace file format json_format
+type = json;
+
+create or replace stage json_stage
+file_format = json_format;
+
+copy into @json_stage
+from( select menu_item_health_metrics_obj
+    from tasty_bytes_db.raw.menu
+);
+
+select * 
+from table(
+    infer_schema(
+        location => '@json_stage'
+            ,file_format => 'json_format'
+    )
+);
+
+create or replace table menu_item_health_metrics 
+using template (
+    select array_agg(object_construct(*))
+    from table( 
+        infer_schema(
+            location=>'@json_stage',
+            file_format=>'json_format')));
