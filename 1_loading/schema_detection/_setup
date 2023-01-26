@@ -1,0 +1,34 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// SET WAREHOUSE CONTEXT
+create warehouse if not exists load_wh;
+alter warehouse load_wh set warehouse_size = xsmall;
+use warehouse load_wh;
+
+// CREATE DATABASE
+create database if not exists ingest_db;
+
+// CREATE SCHEMA
+create or replace schema ingest_db.raw_data;
+
+// SET SCHEMA CONTEXT
+use schema ingest_db.raw_data;
+
+// CREATE STAGE
+create or replace stage csv_stage;
+
+// CREATE CSV INFER FILE FORMAT
+create file format if not exists csv_infer_format
+type = csv
+parse_header = true;
+
+// CREATE CSV LOAD FILE FORMAT
+create file format if not exists csv_load_format
+type = csv
+skip_header = 1;
+
+// CREATE CSV UNLOAD FILE FORMAT
+create file format if not exists csv_unload_format
+type = csv
+skip_header = 0;
