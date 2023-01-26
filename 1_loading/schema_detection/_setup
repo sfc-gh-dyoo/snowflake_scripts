@@ -2,8 +2,7 @@
 use role accountadmin;
 
 // SET WAREHOUSE CONTEXT
-create warehouse if not exists load_wh;
-alter warehouse load_wh set warehouse_size = xsmall;
+create or replace warehouse load_wh with warehouse_size = xsmall;
 use warehouse load_wh;
 
 // CREATE DATABASE
@@ -19,12 +18,12 @@ use schema ingest_db.raw_data;
 create or replace stage csv_stage;
 
 // CREATE CSV INFER FILE FORMAT
-create file format if not exists csv_infer_format
+create or replace file format csv_infer_format
 type = csv
 parse_header = true;
 
 // CREATE CSV LOAD FILE FORMAT
-create file format if not exists csv_load_format
+create or replace file format csv_load_format
 type = csv
 skip_header = 1;
 
@@ -34,9 +33,9 @@ type = csv
 skip_header = 0;
 
 // CREATE JSON FILE FORMAT
-create or replace stage json_format
+create or replace file format json_format
 type = json;
 
 // CREATE JSON STAGE
 create or replace stage json_stage
-file_format = json_format;
+file_format = json_format
