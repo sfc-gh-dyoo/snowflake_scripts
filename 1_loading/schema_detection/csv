@@ -1,0 +1,69 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// SET WAREHOUSE CONTEXT
+create warehouse if not exists load_wh;
+use warehouse load_wh;
+
+// SET SCHEMA CONTEXT
+use schema ingest_db.raw_data;
+
+// PULL FILE NAMES
+list @csv_stage;
+select distinct split_part(split_part($1,'/',2),'.',-3) filenames from table(result_scan(last_query_id()));
+
+/********************************************************************
+    HIGHLIGHT AND RUN ALL THE CODE BELOW AFTER SETTING VAR_OBJECT
+********************************************************************/
+
+// SELECT AND SET FILE NAME
+set var_object = '<OBJECT_NAME>';
+
+
+// SET VARIABLES
+set var_location = '@'||$var_file_type||'_stage/'||$var_object;
+set var_pattern = '.*'||$var_object||'.*[.]csv.gz';
+
+// CREATE CSV INFER FILE FORMAT
+create file format if not exists tasty_bytes_db.raw_data.csv_infer_format
+type = csv
+parse_header = true;
+
+// CREATE CSV LOAD FILE FORMAT
+create file format if not exists tasty_bytes_db.raw_data.csv_load_format
+type = csv
+skip_header = 1;
+
+// CREATE CSV UNLOAD FILE FORMAT
+create file format if not exists tasty_bytes_db.raw_data.csv_unload_format
+type = csv
+skip_header = 0;
+
+// SELECT COLUMN NAMES AND FIELD TYPES
+select *
+from table(
+    infer_schema(
+        location => $var_location
+        ,file_format => 'csv_infer_format') );
+        
+// CREATE TABLE
+create or replace table identifier($var_object)
+using template (
+    select array_agg(object_construct(*)) within group (order by order_id)
+    from table( 
+        infer_schema(
+            location => $var_location
+            ,file_format => 'csv_infer_format')));
+
+// WORKAROUND
+set select_statement = (select replace(get_ddl('table', $var_object), 'VARIANT', 'VARCHAR(16777216)'));
+execute immediate $select_statement;
+
+// COPY INTO TABLE 
+copy into identifier($var_object)
+from @csv_stage
+file_format = csv_load_format
+,pattern = $var_pattern;
+
+// CHECK DATA
+select * from identifier($var_object);
