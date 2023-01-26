@@ -1,0 +1,17 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// SET WAREHOUSE CONTEXT
+use warehouse load_wh;
+
+// SET SCHEMA CONTEXT
+use schema ingest_db.raw_data;
+
+// COPY INTO STAGE TO UNLOAD
+copy into @csv_stage/customer
+from sample_data.tpch_sf1.customer
+file_format = csv_unload_format
+header = true;
+
+// CHECK DATA
+list @csv_stage/customer;
