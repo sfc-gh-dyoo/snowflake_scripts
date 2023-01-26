@@ -25,17 +25,17 @@ set var_location = '@'||$var_file_type||'_stage/'||$var_object;
 set var_pattern = '.*'||$var_object||'.*[.]csv.gz';
 
 // CREATE CSV INFER FILE FORMAT
-create file format if not exists tasty_bytes_db.raw_data.csv_infer_format
+create file format if not exists csv_infer_format
 type = csv
 parse_header = true;
 
 // CREATE CSV LOAD FILE FORMAT
-create file format if not exists tasty_bytes_db.raw_data.csv_load_format
+create file format if not exists csv_load_format
 type = csv
 skip_header = 1;
 
 // CREATE CSV UNLOAD FILE FORMAT
-create file format if not exists tasty_bytes_db.raw_data.csv_unload_format
+create file format if not exists csv_unload_format
 type = csv
 skip_header = 0;
 
