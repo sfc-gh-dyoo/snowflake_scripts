@@ -55,9 +55,18 @@ using template (
             location => $var_location
             ,file_format => 'csv_infer_format')));
 
-// WORKAROUND
-set select_statement = (select replace(get_ddl('table', $var_object), 'VARIANT', 'VARCHAR(16777216)'));
-execute immediate $select_statement;
+// WORKAROUND// WORKAROUND
+select replace(get_ddl('table', $var_object), 'VARIANT', 'VARCHAR(16777216)');
+create or replace TABLE CUSTOMER (
+	C_CUSTKEY NUMBER(6,0),
+	C_NAME VARCHAR(16777216),
+	C_ADDRESS VARCHAR(16777216),
+	C_NATIONKEY NUMBER(2,0),
+	C_PHONE VARCHAR(16777216),
+	C_ACCTBAL NUMBER(6,2),
+	C_MKTSEGMENT VARCHAR(16777216),
+	C_COMMENT VARCHAR(16777216)
+);
 
 // COPY INTO TABLE 
 copy into identifier($var_object)
