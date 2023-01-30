@@ -88,7 +88,7 @@ create schema if not exists ingest_db.s3_bucket;
 use schema ingest_db.s3_bucket;
 
 // CREATE CSV FILE FORMAT
-create file format if not exists csv_format;
+create file format if not exists csv_format
     type = csv
     field_delimiter = ','
     skip_header = 1;
