@@ -1,3 +1,40 @@
+/* CREATE POLICY IN AWS S3
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+              "s3:GetObject",
+              "s3:GetObjectVersion"
+            ],
+            "Resource": "arn:aws:s3:::<bucket>/<prefix>/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetBucketLocation"
+            ],
+            "Resource": "arn:aws:s3:::<bucket>",
+            "Condition": {
+                "StringLike": {
+                    "s3:prefix": [
+                        "<prefix>/*"
+                    ]
+                }
+            }
+        }
+    ]
+}
+*/
+
+/* CREATE ROLE IN AWS S3
+1. THIS AWS ACCOUNT
+2. CHECK "Require external ID
+3. External ID = "0000"
+*/
+
 // SET ROLE CONTEXT
 use role accountadmin;
 
@@ -11,6 +48,35 @@ create storage integration if not exists s3_int
     enabled = true
     storage_aws_role_arn = 'arn:aws:iam::<############>:role/<role_name>'
     storage_allowed_locations = ('s3://<bucket>/<path/');
+    
+ // DESCRIBE STORAGE INTEGRATION
+ desc integration s3_int;
+ 
+ // COPY STORAGE_AWS_IAM_USER_ARN
+ // COPY STORAGE_AWS_EXTERNAL_ID
+
+ 
+ /* EDIT TRUST RELATIONSHIP FOR ROLE IN AWS S3
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "<snowflake_user_arn>"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "<snowflake_external_id>"
+        }
+      }
+    }
+  ]
+}
+*/
+ 
 
 // CREATE DATABASE
 create database if not exists ingest_db;
@@ -20,7 +86,6 @@ create schema if not exists ingest_db.s3_bucket;
 
 // SET OBJECT CONTEXT
 use schema ingest_db.s3_bucket;
-
 
 // CREATE CSV FILE FORMAT
 create file format if not exists csv_format;
