@@ -1,0 +1,9 @@
+
+select to_date(date_trunc(month,end_time)) month
+    ,sum(credits_used) compute_credits
+    ,(compute_credits * 1.48) compute_cost
+    ,sum(bytes_inserted/1024/1024/1024) terabytes_inserted
+    ,(terabytes_inserted*23) terabytes_inserted_storage_cost
+    ,((compute_cost+terabytes_inserted_storage_cost)/terabytes_inserted) total_cost_per_terabytes
+from snowflake.account_usage.pipe_usage_history
+group by 1;
