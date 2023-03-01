@@ -1,4 +1,9 @@
+// SET CONTEXT
+use role accountadmin;
+create or replace warehouse admin_wh;
+use schema snowflake.account_usage;
 
+// LIST OF PIPES BY CREDITS AND FILE SIZE
 select to_date(date_trunc(month,end_time)) month
     ,sum(credits_used) compute_credits
     ,(compute_credits * 1.48) compute_cost
@@ -7,3 +12,6 @@ select to_date(date_trunc(month,end_time)) month
     ,((compute_cost+terabytes_inserted_storage_cost)/terabytes_inserted) total_cost_per_terabytes
 from snowflake.account_usage.pipe_usage_history
 group by 1;
+
+// CLEAN UP
+drop warehouse admin_wh;
