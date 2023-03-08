@@ -9,8 +9,9 @@ This illustrates how to utilize Snowpark for feature engineering, training, and 
 The TPC DS data is available already to you in your Snowflake account as shared database utlizing Snowflake's data sharing. This means you as the user will never incur the costs of storing this large dataset. 
 
  1. Edit the *creds.json* file to with your Snowfalke account name, user name, and password to connect to your account. 
- 2. Run all the script in the 01_environmental_setup.sql
- 3. Run python 02_feature_engineering.py in terminal
+ 2. Run all the script in the 01_environmental_setup.sql 
+ 3. Run conda install environment.yml
+ 4. Run python 02_feature_engineering.py in terminal
 
 ### Cost Performance
 
