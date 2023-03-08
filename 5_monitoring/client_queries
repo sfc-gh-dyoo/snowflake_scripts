@@ -1,0 +1,8 @@
+select s.session_id
+    ,s.client_application_id
+    ,s.client_environment
+    ,qh.*
+from snowflake.account_usage.query_history qh
+left join snowflake.account_usage.sessions s on qh.session_id = s.session_id
+where not startswith(s.client_application_id,'Snowflake UI')
+    and not contains(s.client_environment,'"APPLICATION":"Snowflake Web App"');
