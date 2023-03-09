@@ -121,7 +121,7 @@ pattern='*.csv*';
 
 
 // CREATE JSON FILE FORMAT
-create file format if not exists json_format;
+create file format if not exists json_format
     type = json;
 
 // CREATE JSON STAGE
