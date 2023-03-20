@@ -1,0 +1,50 @@
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// CREATE WAREHOUSE
+create warehouse if not exists ingest_wh;
+
+// CREATE STORAGE INTEGRATION
+create storage integration if not exists blob_int
+    type = external_stage
+    storage_provider = azure
+    enabled = true
+    azure_tenant_id = '<TENANT_ID>'
+    storage_allowed_locations = ('azure://<account>.blob.core.windows.net/<container>/<path>/');
+    
+ // DESCRIBE STORAGE INTEGRATION
+ desc integration blob_int;
+ 
+ // NAVIGATE TO AZURE_CONSENT_URL AND ACCEPT
+ // COPY AZURE_MULTI_TENANT_APP_NAME BEFORE THE UNDERSCORE
+ 
+/* NAVIGATE TO AZURE SERVICES > STORAGE ACCOUNTS > ACCESS CONTROL (IAM) > ADD ROLE ASSIGNMENT
+- Select Storage Blob Data Contributor
+- NEXT
+- + Select memebers
+- search for AZURE_MULTI_TENANT_APP_NAME before underscore
+*/
+
+// CREATE DATABASE
+create database if not exists ingest_db;
+
+// CREATE SCHEMA
+create schema if not exists ingest_db.blob;
+
+// SET OBJECT CONTEXT
+use schema ingest_db.blob;
+
+// CREATE CSV FILE FORMAT
+create file format if not exists csv_format
+    type = csv
+    field_delimiter = ','
+    skip_header = 1;
+
+// CREATE CSV STAGE
+create stage if not exists csv_stage
+    url = 'azure://<account>.blob.core.windows.net/<container>/<path>/'
+    storage_integration = blob_int
+    file_format = ( format_name = 'csv_format' );
+
+// LIST CSV FILES FROM STAGE
+list @csv_stage;
