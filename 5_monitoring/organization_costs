@@ -1,7 +1,7 @@
 // SET CONTEXT
 use role accountadmin;
-create warehouse if not exists compute_wh;
-alter warehouse compute_wh set warehouse_size = xsmall;
+create warehouse if not exists admin_wh;
+alter warehouse admin_wh set warehouse_size = xsmall;
 use schema snowflake.organization_usage;
 
 // DAILY
