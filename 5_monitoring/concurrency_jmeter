@@ -1,0 +1,98 @@
+use role accountadmin;
+use role jmeter_role;
+
+create warehouse if not exists jmeter_wh with 
+    warehouse_size = xsmall 
+    max_cluster_count = 10;
+
+use warehouse jmeter_wh;
+
+create role if not exists jmeter_role;
+
+grant role jmeter_role to role sysadmin;
+
+create user if not exists jmeter_user
+    password = '<STRING>'
+    must_change_password = false
+    default_warehouse = jmeter_wh
+    default_role = jmeter_role;
+
+grant role jmeter_role to user jmeter_user;
+    
+alter user jmeter_user set use_cached_result = false;
+
+create database if not exists jmeter_db;
+
+use schema jmeter_db.public;
+
+grant all on warehouse jmeter_wh to role jmeter_role;
+grant all on database jmeter_db to role jmeter_role;
+grant all on all schemas in database jmeter_db to role jmeter_role;
+grant all on all stages in database jmeter_db to role jmeter_role;
+grant all on all file formats in database jmeter_db to role jmeter_role;
+grant all on all functions in database jmeter_db to role jmeter_role;
+grant all on all procedures in database jmeter_db to role jmeter_role;
+grant all on all tables in database jmeter_db to role jmeter_role;
+grant all on all views in database jmeter_db to role jmeter_role;
+grant all on all materialized views in database jmeter_db to role jmeter_role;
+grant all on future schemas in database jmeter_db to role jmeter_role;
+grant all on future stages in database jmeter_db to role jmeter_role;
+grant all on future file formats in database jmeter_db to role jmeter_role;
+grant all on future functions in database jmeter_db to role jmeter_role;
+grant all on future procedures in database jmeter_db to role jmeter_role;
+grant all on future tables in database jmeter_db to role jmeter_role;
+grant all on future views in database jmeter_db to role jmeter_role;
+grant all on future materialized views in database jmeter_db to role jmeter_role;
+
+use role jmeter_role;
+
+create stage csv_stage;
+
+create file format if not exists csv_load_format
+type = csv
+skip_header = 1;
+
+list @csv_stage;
+
+create table if not exists <table_name> (
+  <COLUMN_NAME> <FIELD_TYPE>
+);
+
+copy into <table_name>
+from @csv_stage/<table_name>
+file_format = csv_load_format;
+
+SELECT '<COLUMN_NAME> = ''' || <COLUMN_NAME> || 
+        ''' AND <COLUMN_NAME> = ''' || <COLUMN_NAME> ||
+        '''' as FILTERLIST
+     ,count(*) as RecCount 
+from jmeter_db.public.<table_name>
+group by 1 
+having RecCount > 0
+order by 2 desc;
+
+alter warehouse jmeter_wh suspend;
+
+// VIEW TEST RESULTS
+select 
+     qh.warehouse_name
+    ,qh.warehouse_size
+    ,count(distinct qh.cluster_number) count_clusters
+    ,count(qh.query_id) count_queries
+    ,count(qh.session_id) count_sessions
+    ,round(avg(qh.rows_produced),0) avg_rows_produced
+    ,round(avg(qh.bytes_scanned/1024/1024/1024),2) avg_gb_scanned
+    ,round(((timediff(milliseconds,min(qh.start_time),max(qh.end_time)))/1000),2) total_duration_seconds
+    ,round(avg(qh.total_elapsed_time)/1000,4) avg_duration_seconds
+    ,round(min(qh.total_elapsed_time)/1000,4) min_duration_seconds
+    ,round(max(qh.total_elapsed_time)/1000,4) max_duration_seconds
+    ,round(sum((bytes_spilled_to_remote_storage + bytes_spilled_to_local_storage)/1024/1024/1024),2) sum_gb_spilled -- warehouse undersized
+    ,round(sum(qh.queued_overload_time)/sum(qh.total_elapsed_time),2) percent_duration_queued -- cluster count small
+from snowflake.account_usage.query_history qh
+where qh.warehouse_name = 'JMETER_WH'
+    and qh.user_name = 'JMETER_USER'
+    and qh.query_type = 'SELECT'
+    and to_date(qh.start_time) = current_date()
+    and warehouse_size is not null
+    and contains(split_part(qh.query_text,'--',2),'jmeter_test_13')
+group by 1,2;
