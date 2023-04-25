@@ -1,0 +1,19 @@
+// SET CONTEXT
+use role accountadmin;
+create warehouse if not exists admin_wh;
+alter warehouse admin_wh set warehouse_size = xsmall;
+grant all on warehouse admin_wh to role orgadmin;
+use role orgadmin;
+use warehouse admin_wh;
+use schema snowflake.organization_usage;
+
+// RUN CODE
+select to_date(end_time) usage_date
+    ,organization_name
+    ,account_name
+    ,account_locator
+    ,warehouse_name
+    ,sum(credits_used) sum_credits
+from warehouse_metering_history
+group by 1,2,3,4,5 
+having sum_credits != 0;
