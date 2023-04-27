@@ -1,35 +1,3 @@
-// SET ROLE CONTEXT
-use role accountadmin;
-
-// CREATE WAREHOUSE
-create or replace warehouse stream_wh with warehouse_size = medium;
-create or replace warehouse sample_wh with warehouse_size = medium;
-
-// SET WAREHOUSE CONTEXT
-use warehouse sample_wh;
-
-// CREATE DATABASE
-create or replace database sample_db; 
-
-// SET SCHEMA CONTEXT
-use schema sample_db.public;
-
-// CREATE SAMPLE DATA
-create or replace table nation as
-select * 
-from sample_data.tpch_sf10.nation;
-    
-create or replace table region as
-select * 
-from sample_data.tpch_sf10.region;
-    
-create or replace table customer as
-select * 
-from sample_data.tpch_sf10.customer 
-sample (99);
-
-// CREATE JOIN VIEW
-create or replace view join_view as
 select c_custkey id
     ,c_name name
     ,c_address address
@@ -54,8 +22,7 @@ select * from join_view;
 
 // INSERT NEW CUSTOMER DATA
 insert into customer
-    select * 
-    from sample_data.tpch_sf10.customer
+    select * from tpc_db.tpch_sf1.customer
     where c_custkey not in (select c_custkey from customer);
 
 // MONITOR REFRESHES
