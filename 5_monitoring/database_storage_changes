@@ -40,7 +40,7 @@ left join mbl on lm.account_name = mbl.account_name
     and lm.account_locator = mbl.account_locator
     and lm.region = mbl.region
     and lm.database_name = mbl.database_name
-//    and lm.date_month = dateadd(month,1,mbl.date_month)
+    and lm.date_month = dateadd(month,1,mbl.date_month)
 where mom_amount_change is not null
     and abs(mom_amount_change) > 0
 order by abs(mom_amount_change) desc;
