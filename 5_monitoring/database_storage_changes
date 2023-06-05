@@ -1,14 +1,46 @@
-select * from(
-    select database_id||'-'||database_name database_name
-        ,usage_date change_date
-        ,round(sum(average_database_bytes/1024/1024/1024),4) storage_gb
-        ,storage_gb - ifnull(lag(storage_gb) over (partition by database_id||'-'||database_name order by usage_date),0) - storage_gb storage_gb_change
-        ,round(sum(average_failsafe_bytes/1024/1024/1024),4) failsafe_gb
-        ,failsafe_gb - ifnull(lag(failsafe_gb) over (partition by database_id||'-'||database_name order by usage_date),0) failsafe_gb_change
-    from snowflake.account_usage.database_storage_usage_history
-    where usage_date > '2022-11-21'
-        and usage_date < '2022-11-27'
-    group by 1,2
-    order by 1,2)
-where (abs(storage_gb_change) > storage_gb/10 
-        or abs(failsafe_gb_change) > failsafe_gb/10);
+// SET ROLE CONTEXT
+use role accountadmin;
+
+// SET WAREHOUSE CONTEXT
+create warehouse if not exists accountadmin_wh with
+    warehouse_size = small
+    auto_suspend = 60;
+use warehouse accountadmin_wh;
+
+// RUN MoM DATABASE STORAGE CHANGES QUERY 
+with dsuh as(
+    select account_name, account_locator, region
+        ,database_name
+        ,date_trunc(month,usage_date) date_month
+        ,round(sum(average_database_bytes+average_failsafe_bytes)/1024/1024/1024,0) rounded_storage_gbs
+    from snowflake.organization_usage.database_storage_usage_history
+    group by 1,2,3,4,5
+    having rounded_storage_gbs > 0
+    )
+,lm as(
+    select *
+    from dsuh
+    where date_month = date_trunc(month,dateadd(month,-1,current_date))
+)
+,mbl as(
+    select *
+    from dsuh
+    where date_month = date_trunc(month,dateadd(month,-2,current_date))
+)
+select lm.account_name
+    ,lm.account_locator
+    ,lm.region
+    ,lm.database_name
+    ,lm.rounded_storage_gbs last_month_rounded_storage_gbs
+    ,mbl.rounded_storage_gbs month_before_last_rounded_storage_gbs
+    ,(last_month_rounded_storage_gbs - month_before_last_rounded_storage_gbs) mom_amount_change
+    ,round(((mom_amount_change/month_before_last_rounded_storage_gbs)*100),0) mom_percent_change
+from lm
+left join mbl on lm.account_name = mbl.account_name
+    and lm.account_locator = mbl.account_locator
+    and lm.region = mbl.region
+    and lm.database_name = mbl.database_name
+//    and lm.date_month = dateadd(month,1,mbl.date_month)
+where mom_amount_change is not null
+    and abs(mom_amount_change) > 0
+order by abs(mom_amount_change) desc;
