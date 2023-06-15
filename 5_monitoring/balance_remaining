@@ -1,10 +1,15 @@
 use role accountadmin;
-create warehouse if not exists orgadmin_wh;
-alter warehouse orgadmin_wh set warehouse_size = xsmall;
-grant all on warehouse orgadmin_wh to role orgadmin;
-use role orgadmin;
+create warehouse if not exists admin_wh;
+alter warehouse admin_wh set warehouse_size = xsmall;
 
 select rbd.*
 from snowflake.organization_usage.remaining_balance_daily rbd
 left join (select max(date) date from snowflake.organization_usage.remaining_balance_daily) rbdl
 where rbd.date = rbdl.date;
+
+select round(ci.amount,2) total_credits
+    ,(free_usage_balance + capacity_balance + rollover_balance) credit_balance
+    ,(total_credits - credit_balance) credits_consumed
+from snowflake.organization_usage.remaining_balance_daily rbd 
+left join snowflake.organization_usage.contract_items ci on rbd.contract_number = ci.contract_number
+where rbd.date = (select max(date) date from snowflake.organization_usage.remaining_balance_daily);
