@@ -1,0 +1,44 @@
+use role securityadmin;
+
+-- SET NAME OF OBJECT
+set var_name = 'TEST';
+
+
+-- RUN ALL THE FOLLOWING
+set var_role = $var_name || '_role';
+create or replace role identifier( $var_role );
+grant role identifier( $var_role ) to role sysadmin;
+
+use role sysadmin;
+set var_wh = $var_name || '_wh';
+create or replace warehouse identifier( $var_wh );
+use warehouse identifier( $var_wh );
+set var_db = $var_name || '_db';
+create or replace database identifier( $var_db );
+set var_schema = $var_db || '.public';
+create or replace schema identifier( $var_schema );
+
+grant usage on warehouse identifier( $var_wh ) to role identifier( $var_role );
+grant all privileges on database identifier( $var_db ) to role identifier( $var_role );
+grant all privileges on schema identifier( $var_schema ) to role identifier( $var_role );
+grant all privileges on all tables in schema identifier( $var_schema ) to role identifier( $var_role );
+grant all privileges on all views in schema identifier( $var_schema ) to role identifier( $var_role );
+grant all privileges on all materialized views in schema identifier( $var_schema ) to role identifier( $var_role );
+
+use role securityadmin;
+grant all privileges on future tables in schema identifier( $var_schema ) to role identifier( $var_role );
+grant all privileges on future views in schema identifier( $var_schema ) to role identifier( $var_role );
+grant all privileges on future materialized views in schema identifier( $var_schema ) to role identifier( $var_role );
+
+
+-- SET CONTEXT
+use role identifier( $var_role );
+use warehouse identifier( $var_wh );
+use schema identifier( $var_schema );
+
+-- CLEANUP
+/*
+drop role identifier( $var_role );
+drop warehouse identifier( $var_wh );
+drop database identifier( $var_db );
+*/
